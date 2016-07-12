@@ -1,0 +1,5 @@
+This is a solution to the reddit/r/dailyprogrammer problem featured here: 
+https://www.reddit.com/r/dailyprogrammer/comments/4rug59/20160708_challenge_274_hard_loop_solver/
+
+It has been tested compiling with clang++ --std=c++11
+
