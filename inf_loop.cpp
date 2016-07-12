@@ -87,22 +87,25 @@ public:
     vector<vector<Tile>> gr;
     stringstream ss;
     string line;
+
+    // read in lines one-by-one into line
     while(getline(in, line) && !line.empty()){
+      // setup stream from line
       ss.clear();
       ss.str("");
       ss << line;
 
       vector<Tile> vec;
-
-      // extract tiles from istream
+      // extract tiles from stringstream, insert into vector
       int y;
       while(ss >> y){
         vec.push_back(Tile(y));
       }
-
+      // insern vector into vector
       gr.push_back(vec);
     }
 
+    // validate vector lengths (needs to be rectangular)
     auto k = gr[0].size();
     for(auto i = 1; i < gr.size(); i++){
       if(gr[i].size() != k){
