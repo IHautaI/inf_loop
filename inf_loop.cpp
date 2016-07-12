@@ -196,8 +196,8 @@ void solve(Grid& grid){
   // for each tile
   //A) if not empty
   //B) check if in valid position
-  //C) if so, add current config to Edge instance
-  //D) else rotate
+  //C) if so move to next tile
+  //D) if not rotate
   //E) if options exhausted, find constraining tile that blocks
   //F) unwind to that tile, rotate, -> B)
   return;
