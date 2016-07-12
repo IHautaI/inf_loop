@@ -57,6 +57,10 @@ public:
     return RIGHT & this->state;
   }
 
+  bool empty(){
+    return 0 & this->state;
+  }
+
   friend ostream& operator<<(ostream& stream, const Tile& t){
     stream << t.state;
     return stream;
@@ -184,8 +188,18 @@ private:
 };
 
 
-// solve strategy
+// first solve strategy
 void solve(Grid& grid){
+  // create second Edge instance
+  Edge edges;
+
+  // for each tile
+  //A) if not empty
+  //B) check if in valid position
+  //C) if so, add current config to Edge instance
+  //D) else rotate
+  //E) if options exhausted, find constraining tile that blocks
+  //F) unwind to that tile, rotate, -> B)
   return;
 }
 
@@ -201,6 +215,8 @@ int main(){
     solve(grid);
   }
 
+  cout << "\n";
+  cout << edge;
   // make room
   cout << "\n\n";
   // print solved grid
