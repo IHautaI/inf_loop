@@ -156,8 +156,7 @@ public:
 
     for(int i = 0; i < grid.width; i++){
       for(int j = 0; j < grid.length; j++){
-        auto tile = grid.grid[i][j];
-        this->add_values(i, j, tile, grid.width, grid.length);
+        this->add_values(i, j, grid.grid[i][j], grid.width, grid.length);
       }
     }
   }
