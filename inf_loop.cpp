@@ -3,6 +3,7 @@
 #include <sstream>
 #include <tuple>
 #include <set>
+#include <list>
 using namespace std;
 
 // convenience fxn for making tuple of 2tuples of ints
@@ -64,6 +65,10 @@ public:
   friend ostream& operator<<(ostream& stream, const Tile& t){
     stream << t.state;
     return stream;
+  }
+
+  bool valid(int i, int j, int width, int length){
+    return !((i == 0 && this->up()) || (i == width && this->down()) || (j==0 && this->left()) || (j == length && this->right()));
   }
 
 };
@@ -190,17 +195,51 @@ private:
 
 // first solve strategy
 void solve(Grid& grid){
-  // create second Edge instance
+  <list<tuple<tuple<int,int>,tuple<int,int>>> history;
   Edge edges;
+  int n = 0;
+  int m = 0;
+  auto f = [&](){
+    for(auto i = n; i < grid->grid.width; i++){
+      for(auto j = m; i < grid->grid.length); j++){
+        auto tile = grid->grid[i][j]
 
-  // for each tile
-  //A) if not empty
-  //B) check if in valid position
-  //C) if so move to next tile
-  //D) if not rotate
-  //E) if options exhausted, find constraining tile that blocks
-  //F) unwind to that tile, rotate, -> B)
-  return;
+        int k = 0;
+        while(!tile.valid() && k < 4){
+          tile.rotate();
+          k++;
+        }
+        if(k == 4){
+          edges.fill_edges(grid);
+          for(auto x : edges.edges){
+            set<tuple<tuple<int,int>,tuple<int,int>>> tmp;
+            if(get<1>(x) == make_tuple(i,j)){
+              tmp.insert(x)
+            }
+          }
+          if(tmp.size() != 0){
+            auto y = history.pop_back();
+            while(tmp.find(y) == tmp::end && history.size() != 0){
+              y = history.pop_back();
+            }
+            if(history.size() == 0){
+              cout << "No Solution\n";
+              exit(0);
+            }
+            history.push_back(y);
+            n = get<0>(get<0>(y));
+            m = get<1>(get<0>(y));
+            grid->grid[n][m].rotate();
+            return false;
+          } else {
+            cout << "No Solution\n";
+            exit(0);
+          }
+        }
+      }
+    }
+  }
+  while(!f());
 }
 
 
