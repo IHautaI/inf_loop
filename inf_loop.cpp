@@ -229,6 +229,10 @@ public:
   }
 
   bool partial(pair<int,int> it){
+    if(it == make_pair(0,0)){
+      return true;
+    }
+
     auto end = this->edges.begin();
 
     while(end->first != it){
@@ -279,9 +283,8 @@ void solve(Grid& grid){
 
       // fill in edges
       edges.fill_edges(grid);
-
-      // if no valid configuration and partial not valid up to this point
-      if(tile.rotations == 4 && ! edges.partial(pos)){
+      // if no valid configuration or partial not valid up to this point
+      if(tile.rotations == 4 || (!edges.partial(pos))){
         // reset tile
         tile.reset();
 
@@ -291,7 +294,7 @@ void solve(Grid& grid){
         set<pair<pair<int,int>,pair<int,int>>> tmp;
         // search edges for all that point to tile
         for(auto x : edges.edges){
-          if(get<1>(x) == pos){
+          if(x.first == pos){
             tmp.insert(x);
           }
         }
