@@ -33,15 +33,19 @@ class Tile {
   static const int LEFT = 8;
   static const int RIGHT = 2;
   int start;
-  int state;
+
 
 public:
+  int state;
   int rotations;
 
   // up-right-down-left, clockwise rotation
   void rotate(){
-    int mask = this->state & 1;
-    this->state = (this->state << 1) | mask;
+    bool carry = this->state & 8;
+    this->state = 15 & (this->state << 1);
+    if(carry){
+      this->state = this->state | 1;
+    }
     this->rotations++;
   }
 
@@ -53,22 +57,6 @@ public:
     state = o.start;
     rotations = 0;
   }
-
-  // // move cstr
-  // Tile(Tile&& o): start(std::move(o.start)){
-  //   this->state = o.start;
-  //   this->rotations = 0;
-  // }
-
-  // // copy assignment
-  // Tile& operator=(Tile other){
-  //   if(&other == this){
-  //     return *this;
-  //   }
-  //   swap(start, other.start);
-  //   swap(state, other.state);
-  //   return *this;
-  // }
 
   void reset(){
     this->state = start;
@@ -103,8 +91,7 @@ public:
   bool valid(pair<int,int> pos, int width, int length){
     int i = get<0>(pos);
     int j = get<1>(pos);
-
-    return !((i == 0 && this->up()) || (i == width && this->down()) || (j==0 && this->left()) || (j == length && this->right()));
+    return !((i == 0 && this->up()) || (i == width - 1 && this->down()) || (j == 0 && this->left()) || (j == length - 1 && this->right()));
   }
 
 };
@@ -118,8 +105,8 @@ public:
   int width;
 
   friend ostream& operator<<(ostream& stream, Grid& gr){
-    for(auto i = 0; i<gr.width; i++){
-      for(auto j = 0; j < gr.length; i++){
+    for(auto i = 0; i < gr.width; i++){
+      for(auto j = 0; j < gr.length; j++){
         stream << gr.grid.find(make_pair(i,j))->second << " ";
       }
       stream << "\n";
@@ -154,7 +141,13 @@ public:
     }
 
     // validate size (needs to be rectangular)
-    int target = gr.size() % i;
+    int target;
+    if(i > 1){
+      target = gr.size() / i;
+    }else{
+      target = gr.size();
+    }
+
     map<int,int> check;
 
     for(auto y = 0; y < i; y++){
@@ -162,12 +155,15 @@ public:
     }
 
     for(auto x : gr){
-      check[get<0>(x.first)] += get<1>(x.first);
+      check[get<0>(x.first)] += 1;
     }
 
     for(auto x : check){
       if(x.second != target){
-        cout << "Input not rectangular!";
+        for(auto x : check){
+          cout << "line "<< x.first << ": " << x.second << " lines\n";
+        }
+        cout << "Input not rectangular!\n";
         exit(1);
       }
     }
@@ -175,6 +171,9 @@ public:
     this->grid = gr;
     this->width = i;
     this->length = target;
+    cout << "valid shape input\n";
+    cout << "width: " <<this->width << "\n";
+    cout << "length: " << this->length << "\n";
   }
 
   // convenience fxn for rotating tiles
@@ -218,7 +217,7 @@ public:
   void fill_edges(Grid& grid){
     this->edges.clear();
 
-    for(auto x : grid.grid){
+    for(auto& x : grid.grid){
         this->add_values(x.first, x.second, grid.width, grid.length);
     }
   }
@@ -229,6 +228,25 @@ public:
     return this->valid();
   }
 
+  bool partial(pair<int,int> it){
+    auto end = this->edges.begin();
+
+    while(end->first != it){
+      end++;
+    }
+
+    for(const auto& y: this->edges){
+      if(y.first == it){
+        for(auto x = this->edges.begin(); x != end; x++){
+          auto got = this->edges.find(swap_pair(y));
+          if(got == end){
+            return false;
+          }
+        }
+      }
+    }
+    return true;
+  }
 private:
   // checks if the current edge list is a valid solution
   bool valid(){
@@ -249,19 +267,21 @@ void solve(Grid& grid){
 
   Edge edges;
 
-  auto it = grid.grid.begin();
-
-  auto f = [&](){
+  auto f = [&](map<pair<int,int>,Tile>::iterator& it){
     while(it != grid.grid.end()){
-      auto tile = it->second;
+      auto& tile = it->second;
       auto pos = it->first;
 
-      while(!tile.valid(pos, grid.width, grid.length) && tile.rotations < 4){
+      // rotate tile until a valid config is found (up to 3 times)
+      while((!tile.valid(pos, grid.width, grid.length)) && tile.rotations < 4){
         tile.rotate();
       }
 
-      // if no valid configuration
-      if(tile.rotations == 4){
+      // fill in edges
+      edges.fill_edges(grid);
+
+      // if no valid configuration and partial not valid up to this point
+      if(tile.rotations == 4 && ! edges.partial(pos)){
         // reset tile
         tile.reset();
 
@@ -283,7 +303,7 @@ void solve(Grid& grid){
           // find last tile that pointed to this one
           while(tmp.find(y) == tmp.end() && !history.empty()){
             // reset it and drop from history
-            grid.grid.find(get<0>(y))->second.reset();
+            grid.grid.find(y.first)->second.reset();
             history.pop_back();
 
             // grab next
@@ -293,7 +313,7 @@ void solve(Grid& grid){
           // drop all other entries for y
           {
             auto x = history.back();
-            while(get<0>(x) == get<0>(y)){
+            while(x.first == y.first){
               history.pop_back();
               x = history.back();
             }
@@ -305,11 +325,10 @@ void solve(Grid& grid){
 
           // get it's position
           pos = get<0>(y);
-          // rotate once
-          grid.grid.find(pos)->second.rotate();
           // set iterator
           it = grid.grid.find(pos);
-
+          // rotate once
+          it->second.rotate();
           // and start again
           return false;
         } else {
@@ -319,9 +338,16 @@ void solve(Grid& grid){
       }
       it++;
     }
-    return true;
+    if(edges.complete(grid)){
+      return true;
+    }else{
+      it = grid.grid.find(make_pair(0,0));
+      it->second.rotate();
+      return false;
+    }
   };
-  while(!f());
+  auto it = grid.grid.begin();
+  while(!f(it));
 }
 
 
@@ -329,18 +355,18 @@ int main(){
   Grid grid = Grid(cin);
   Edge edge;
 
+  cout << "Input:\n";
+  cout << grid;
+
   // while not solved, solve it...
   while(!edge.complete(grid)){
-    // for debugging...
-    cout << edge;
-    //solve(grid);
+    solve(grid);
+    cout << "\n";
+    cout << grid;
   }
-
-  cout << "\n";
-  cout << edge;
-  // make room
   cout << "\n\n";
   // print solved grid
+  cout << "solved:\n";
   cout << grid;
 
   return 0;
