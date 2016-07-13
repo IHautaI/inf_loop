@@ -35,9 +35,9 @@ class Tile {
   static const int RIGHT = 2;
   int start;
   int state;
-  int rotations;
 
 public:
+  int rotations;
   // up-right-down-left, clockwise rotation
   void rotate(){
     int mask = this->state & 1;
@@ -45,7 +45,7 @@ public:
     this->rotations++;
   }
 
-  Tile(int x):start(x),state(x){}
+  Tile(int x):start(x){this->state = start;}
 
   void reset(){
     this->state = start;
@@ -77,7 +77,10 @@ public:
     return stream;
   }
 
-  bool valid(int i, int j, int width, int length){
+  bool valid(tuple<int,int> pos, int width, int length){
+    int i = get<0>(pos);
+    int j = get<1>(pos);
+
     return !((i == 0 && this->up()) || (i == width && this->down()) || (j==0 && this->left()) || (j == length && this->right()));
   }
 
@@ -87,14 +90,14 @@ public:
 // Representation of the puzzle - rectangular set of tiles w/ states
 class Grid {
 public:
-  map<Tile> grid;
+  map<tuple<int,int>,Tile> grid;
   int length;
   int width;
 
   friend ostream& operator<<(ostream& stream, Grid& gr){
     for(auto i = 0; i<gr.width; i++){
       for(auto j = 0; j < gr.length; i++){
-        stream << gr[make_tuple(i,j)] << " ";
+        stream << gr.grid[make_tuple(i,j)] << " ";
       }
       stream << "\n";
     }
@@ -103,7 +106,7 @@ public:
 
   Grid(istream& in){
     // create grid from stdin tsv
-    map<Tile> gr;
+    map<tuple<int,int>,Tile> gr;
     stringstream ss;
     string line;
 
@@ -138,7 +141,7 @@ public:
 
     for(auto x : check){
       if(x.second != target){
-        cout << "Input not rectangular!"
+        cout << "Input not rectangular!";
         exit(1);
       }
     }
@@ -189,7 +192,7 @@ public:
   void fill_edges(Grid& grid){
     this->edges.clear();
 
-    for(auto x : grid->grid){
+    for(auto x : grid.grid){
         this->add_values(x.first, x.second, grid.width, grid.length);
     }
   }
@@ -216,69 +219,82 @@ private:
 
 // first solve strategy
 void solve(Grid& grid){
-  <list<tuple<tuple<int,int>,tuple<int,int>>> history;
+  list<tuple<tuple<int,int>,tuple<int,int>>> history;
 
   Edge edges;
-  auto pos = grid->grid.begin();
-  auto f = [&](){
-    while(pos != grid.end()){
-      auto tile = x.first;
 
-        while(!tile.valid() && tile.rotations < 4){
-          tile.rotate();
+  auto it = grid.grid.begin();
+
+  auto f = [&](){
+    while(it != grid.grid.end()){
+      auto tile = it->second;
+      auto pos = it->first;
+
+      while(!tile.valid(pos, grid.width, grid.length) && tile.rotations < 4){
+        tile.rotate();
+      }
+
+      // if no valid configuration
+      if(tile.rotations){
+        // reset tile
+        tile.reset();
+
+        // fill edges
+        edges.fill_edges(grid);
+
+        set<tuple<tuple<int,int>,tuple<int,int>>> tmp;
+        // search edges for all that point to tile
+        for(auto x : edges.edges){
+          if(get<1>(x) == pos){
+            tmp.insert(x);
+          }
         }
 
-        // if no valid configuration
-        if(tile.rotations){
-          // reset tile
-          tile.reset();
+        // if none point to it, backtrack
+        if(tmp.size() != 0){
+          auto y = history.back();
 
-          // fill edges
-          edges.fill_edges(grid);
+          // find last tile that pointed to this one
+          while(tmp.find(y) == tmp.end() && history.size() != 0){
+            // reset it and drop from history
+            grid.grid[get<0>(y)].reset();
+            history.pop_back();
 
-          // search edges for all that point to tile
-          for(auto x : edges.edges){
-            set<tuple<tuple<int,int>,tuple<int,int>>> tmp;
-
-            if(get<1>(x) == pos){
-              tmp.insert(x)
-            }
+            // grab next
+            y = history.back();
           }
 
-          // if none point to it, backtrack
-          if(tmp.size() != 0){
-            auto y = history.pop_back();
-
-            // find last tile that pointed to this one
-            while(tmp.find(y) == tmp.end() && history.size() != 0){
-              // and reset the tiles between
-              y.reset();
-              y = history.pop_back();
+          // drop all other entries for y
+          {
+            auto x = history.back();
+            while(get<0>(x) == get<0>(y)){
+              history.pop_back();
+              x = history.back();
             }
-
-            // if you can't backtrack, that's the end
-            if(history.size() == 0){
-              end();
-            }
-            // add back first matching tile
-            history.push_back(y);
-
-            // get it's position
-            pos = get<0>(y);
-            // rotate once
-            grid->grid[pos].rotate();
-
-            // and start again
-            return false;
-          } else {
-            // locked tile, but none point to it == the end
+          }
+          // if you can't backtrack, that's the end
+          if(history.size() == 0){
             end();
           }
+
+          // get it's position
+          pos = get<0>(y);
+          // rotate once
+          grid.grid[pos].rotate();
+          // set iterator
+          it = grid.grid.find(pos);
+
+          // and start again
+          return false;
+        } else {
+          // locked tile, but none point to it == the end
+          end();
         }
-        pos++;
       }
+      it++;
     }
-  }
+    return true;
+  };
   while(!f());
 }
 
