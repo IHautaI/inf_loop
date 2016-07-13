@@ -1,7 +1,6 @@
 #include <iostream>
 #include <vector>
 #include <sstream>
-#include <tuple>
 #include <set>
 #include <map>
 #include <list>
@@ -14,11 +13,11 @@ void end(){
 }
 
 
-// convenience fxn for swapping the 2tuples in a 2tuple(2tuples(ints))
-tuple<tuple<int,int>,tuple<int,int>> swap_tuple(const tuple<tuple<int,int>,tuple<int,int>>& tup){
+// convenience fxn for swapping the pairs in a pair(pairs(ints))
+pair<pair<int,int>,pair<int,int>> swap_pair(const pair<pair<int,int>,pair<int,int>>& tup){
   auto x = get<0>(tup);
   auto y = get<1>(tup);
-  return make_tuple(y,x);
+  return make_pair(y,x);
 }
 
 
@@ -38,6 +37,7 @@ class Tile {
 
 public:
   int rotations;
+
   // up-right-down-left, clockwise rotation
   void rotate(){
     int mask = this->state & 1;
@@ -45,7 +45,30 @@ public:
     this->rotations++;
   }
 
-  Tile(int x):start(x){this->state = start;}
+  Tile(int x):start(x){state = start;}
+
+  // copy cstr
+  Tile(const Tile& o){
+    start = o.start;
+    state = o.start;
+    rotations = 0;
+  }
+
+  // // move cstr
+  // Tile(Tile&& o): start(std::move(o.start)){
+  //   this->state = o.start;
+  //   this->rotations = 0;
+  // }
+
+  // // copy assignment
+  // Tile& operator=(Tile other){
+  //   if(&other == this){
+  //     return *this;
+  //   }
+  //   swap(start, other.start);
+  //   swap(state, other.state);
+  //   return *this;
+  // }
 
   void reset(){
     this->state = start;
@@ -77,7 +100,7 @@ public:
     return stream;
   }
 
-  bool valid(tuple<int,int> pos, int width, int length){
+  bool valid(pair<int,int> pos, int width, int length){
     int i = get<0>(pos);
     int j = get<1>(pos);
 
@@ -90,14 +113,14 @@ public:
 // Representation of the puzzle - rectangular set of tiles w/ states
 class Grid {
 public:
-  map<tuple<int,int>,Tile> grid;
+  map<pair<int,int>,Tile> grid;
   int length;
   int width;
 
   friend ostream& operator<<(ostream& stream, Grid& gr){
     for(auto i = 0; i<gr.width; i++){
       for(auto j = 0; j < gr.length; i++){
-        stream << gr.grid[make_tuple(i,j)] << " ";
+        stream << gr.grid.find(make_pair(i,j))->second << " ";
       }
       stream << "\n";
     }
@@ -106,7 +129,7 @@ public:
 
   Grid(istream& in){
     // create grid from stdin tsv
-    map<tuple<int,int>,Tile> gr;
+    map<pair<int,int>,Tile> gr;
     stringstream ss;
     string line;
 
@@ -122,7 +145,9 @@ public:
       int y;
       int j = 0;
       while(ss >> y){
-        gr[make_tuple(i,j)] = Tile(y);
+        Tile t(y);
+        gr.insert(make_pair(make_pair(i,j),t));
+        // gr[make_pair(i,j)] = t;
         j++;
       }
       i++;
@@ -130,7 +155,8 @@ public:
 
     // validate size (needs to be rectangular)
     int target = gr.size() % i;
-    map<int, int> check;
+    map<int,int> check;
+
     for(auto y = 0; y < i; y++){
       check[y] = 0;
     }
@@ -152,8 +178,8 @@ public:
   }
 
   // convenience fxn for rotating tiles
-  void rotate(tuple<int,int> pos){
-    this->grid[pos].rotate();
+  void rotate(pair<int,int> pos){
+    this->grid.find(pos)->second.rotate();
   }
 
 };
@@ -161,23 +187,23 @@ public:
 // Class for manipulating an edge list for a Grid
 class Edge {
 public:
-  set<tuple<tuple<int,int>,tuple<int,int>>> edges;
+  set<pair<pair<int,int>,pair<int,int>>> edges;
 
-  void add_values(tuple<int,int> pos, Tile& tile, int width, int length){
+  void add_values(pair<int,int> pos, Tile& tile, int width, int length){
     int i = get<0>(pos);
     int j = get<1>(pos);
 
     if(tile.up() && i > 0){
-      this->edges.insert(pos, make_tuple(i-1, j));
+      this->edges.insert(make_pair(pos, make_pair(i-1, j)));
     }
     if(tile.down() && i < width - 1){
-      this->edges.insert(pos, make_tuple(i+1, j));
+      this->edges.insert(make_pair(pos, make_pair(i+1, j)));
     }
     if(tile.left() && j > 0){
-      this->edges.insert(pos, make_tuple(i, j-1));
+      this->edges.insert(make_pair(pos, make_pair(i, j-1)));
     }
     if(tile.right() && j < length - 1){
-      this->edges.insert(pos, make_tuple(i, j+1));
+      this->edges.insert(make_pair(pos, make_pair(i, j+1)));
     }
   }
 
@@ -207,7 +233,7 @@ private:
   // checks if the current edge list is a valid solution
   bool valid(){
     for(const auto& x: this->edges){
-      set<tuple<tuple<int,int>,tuple<int,int>>>::const_iterator got = this->edges.find(swap_tuple(x));
+      set<pair<pair<int,int>,pair<int,int>>>::const_iterator got = this->edges.find(swap_pair(x));
       if(got == this->edges.end()){
         return false;
       }
@@ -219,7 +245,7 @@ private:
 
 // first solve strategy
 void solve(Grid& grid){
-  list<tuple<tuple<int,int>,tuple<int,int>>> history;
+  list<pair<pair<int,int>,pair<int,int>>> history;
 
   Edge edges;
 
@@ -235,14 +261,14 @@ void solve(Grid& grid){
       }
 
       // if no valid configuration
-      if(tile.rotations){
+      if(tile.rotations == 4){
         // reset tile
         tile.reset();
 
         // fill edges
         edges.fill_edges(grid);
 
-        set<tuple<tuple<int,int>,tuple<int,int>>> tmp;
+        set<pair<pair<int,int>,pair<int,int>>> tmp;
         // search edges for all that point to tile
         for(auto x : edges.edges){
           if(get<1>(x) == pos){
@@ -250,14 +276,14 @@ void solve(Grid& grid){
           }
         }
 
-        // if none point to it, backtrack
-        if(tmp.size() != 0){
+        // if something points to it, backtrack to them
+        if(!tmp.empty()){
           auto y = history.back();
 
           // find last tile that pointed to this one
-          while(tmp.find(y) == tmp.end() && history.size() != 0){
+          while(tmp.find(y) == tmp.end() && !history.empty()){
             // reset it and drop from history
-            grid.grid[get<0>(y)].reset();
+            grid.grid.find(get<0>(y))->second.reset();
             history.pop_back();
 
             // grab next
@@ -273,14 +299,14 @@ void solve(Grid& grid){
             }
           }
           // if you can't backtrack, that's the end
-          if(history.size() == 0){
+          if(history.empty()){
             end();
           }
 
           // get it's position
           pos = get<0>(y);
           // rotate once
-          grid.grid[pos].rotate();
+          grid.grid.find(pos)->second.rotate();
           // set iterator
           it = grid.grid.find(pos);
 
@@ -307,7 +333,7 @@ int main(){
   while(!edge.complete(grid)){
     // for debugging...
     cout << edge;
-    solve(grid);
+    //solve(grid);
   }
 
   cout << "\n";
