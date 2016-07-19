@@ -34,22 +34,46 @@ class Tile {
   static const int RIGHT = 2;
   int start;
 
+  void update(){
+    if(UP & this->state && this->pos.first != 0){
+      points_to.push_back(make_pair(this->pos.first - 1, this->pos.second));
+    }
+    if(DOWN & this->state && this->pos.first != this->end.first){
+      points_to.push_back(make_pair(this->pos.first + 1, this->pos.second));
+    }
+    if(LEFT & this->state && this->pos.second != 0){
+      points_to.push_back(make_pair(this->pos.first, this->pos.second - 1));
+    }
+    if(RIGHT & this->state && this->pos.second != this->end.second){
+      points_to.push_back(make_pair(this->pos.first, this->pos.second + 1));
+    }
+  }
 
 public:
   int state;
   int rotations;
+  pair<int,int> pos;
+  vector<pair<int,in>> points_to;
 
   // up-right-down-left, clockwise rotation
-  void rotate(){
+  // returns true if it can continue rotating
+  bool rotate(){
     bool carry = this->state & 8;
     this->state = 15 & (this->state << 1);
     if(carry){
       this->state = this->state | 1;
     }
     this->rotations++;
+    this->update();
+    return this->rotations < 3;
   }
 
-  Tile(int x):start(x){state = start;}
+  void reset(){
+    this->state = this->start;
+    this->rotations = 0;
+  }
+
+  Tile(int x, pair<int,int> y):start(x),pos(y){state = start; this->update();}
 
   // copy cstr
   Tile(const Tile& o){
@@ -61,26 +85,11 @@ public:
   void reset(){
     this->state = start;
     this->rotations = 0;
-  }
-
-  bool up(){
-    return UP & this->state;
-  }
-
-  bool down(){
-    return DOWN & this->state;
-  }
-
-  bool left(){
-    return LEFT & this->state;
-  }
-
-  bool right(){
-    return RIGHT & this->state;
+    this->update();
   }
 
   bool empty(){
-    return 0 & this->state;
+    return 0 | this->state;
   }
 
   friend ostream& operator<<(ostream& stream, const Tile& t){
@@ -91,7 +100,7 @@ public:
   bool valid(pair<int,int> pos, int width, int length){
     int i = get<0>(pos);
     int j = get<1>(pos);
-    return !((i == 0 && this->up()) || (i == width - 1 && this->down()) || (j == 0 && this->left()) || (j == length - 1 && this->right()));
+    return !((i == 0 && this->state & UP) || (i == width - 1 && this->state & DOWN) || (j == 0 && this->state & LEFT) || (j == length - 1 && this->state & RIGHT));
   }
 
 };
@@ -100,29 +109,38 @@ public:
 // Representation of the puzzle - rectangular set of tiles w/ states
 class Grid {
 public:
-  map<pair<int,int>,Tile> grid;
-  int length;
-  int width;
+  vector<Tile> grid;
+
+  vector<Tile>::iterator begin(){
+    return grid.begin();
+  }
+
+  vector<Tile>::iterator end(){
+    return grid.end();
+  }
 
   friend ostream& operator<<(ostream& stream, Grid& gr){
-    for(auto i = 0; i < gr.width; i++){
-      for(auto j = 0; j < gr.length; j++){
-        stream << gr.grid.find(make_pair(i,j))->second << " ";
+    for(auto x : grid){
+      if(x.pos.second == 0){
+        stream << "\n";
       }
-      stream << "\n";
+      stream << x << " ";
     }
+    stream << "\n";
+
     return stream;
   }
 
   Grid(istream& in){
     // create grid from stdin tsv
-    map<pair<int,int>,Tile> gr;
+    vector<Tile> gr;
+
     stringstream ss;
     string line;
 
     int i = 0;
     // read in lines one-by-one into line
-    while(getline(in, line) && !line.empty()){
+    while(getline(in, line)){
       // setup stream from line
       ss.clear();
       ss.str("");
@@ -131,42 +149,24 @@ public:
       // extract tiles from stringstream, put in map
       int y;
       int j = 0;
+      vector<int> check;
       while(ss >> y){
-        Tile t(y);
-        gr.insert(make_pair(make_pair(i,j),t));
-        // gr[make_pair(i,j)] = t;
+        Tile t(y, make_pair(i,j));
+        gr.push_back(t);
         j++;
       }
+      check.push_back(j);
       i++;
     }
 
-    // validate size (needs to be rectangular)
-    int target;
-    if(i > 1){
-      target = gr.size() / i;
-    }else{
-      target = gr.size();
-    }
-
-    map<int,int> check;
-
-    for(auto y = 0; y < i; y++){
-      check[y] = 0;
-    }
-
-    for(auto x : gr){
-      check[get<0>(x.first)] += 1;
-    }
-
-    for(auto x : check){
-      if(x.second != target){
-        for(auto x : check){
-          cout << "line "<< x.first << ": " << x.second << " lines\n";
-        }
-        cout << "Input not rectangular!\n";
+    // validate size, should be rectangular
+    for(auto& x: check){
+      if(x != check[0]){
+        cerr << "Invalid Input, not rectangular.  Exiting" << endl;
         exit(1);
       }
     }
+
     // set values
     this->grid = gr;
     this->width = i;
@@ -176,181 +176,29 @@ public:
     cout << "length: " << this->length << "\n";
   }
 
-  // convenience fxn for rotating tiles
-  void rotate(pair<int,int> pos){
-    this->grid.find(pos)->second.rotate();
-  }
-
-};
-
-// Class for manipulating an edge list for a Grid
-class Edge {
-public:
-  set<pair<pair<int,int>,pair<int,int>>> edges;
-
-  void add_values(pair<int,int> pos, Tile& tile, int width, int length){
-    int i = get<0>(pos);
-    int j = get<1>(pos);
-
-    if(tile.up() && i > 0){
-      this->edges.insert(make_pair(pos, make_pair(i-1, j)));
-    }
-    if(tile.down() && i < width - 1){
-      this->edges.insert(make_pair(pos, make_pair(i+1, j)));
-    }
-    if(tile.left() && j > 0){
-      this->edges.insert(make_pair(pos, make_pair(i, j-1)));
-    }
-    if(tile.right() && j < length - 1){
-      this->edges.insert(make_pair(pos, make_pair(i, j+1)));
-    }
-  }
-
-  friend ostream& operator<<(ostream& stream, const Edge& edge){
-    for(auto x : edge.edges){
-      stream << "((" << get<0>(get<0>(x)) << "," << get<1>(get<0>(x)) << "),(" << get<0>(get<1>(x)) << "," << get<1>(get<1>(x)) << ")) ";
-    }
-    return stream;
-  }
-
-  // fill edge list for given grid
-  void fill_edges(Grid& grid){
-    this->edges.clear();
-
-    for(auto& x : grid.grid){
-        this->add_values(x.first, x.second, grid.width, grid.length);
-    }
-  }
-
-  // fill + check validity
-  bool complete(Grid& grid){
-    this->fill_edges(grid);
-    return this->valid();
-  }
-
-  bool partial(pair<int,int> it){
-    if(it == make_pair(0,0)){
-      return true;
-    }
-
-    auto end = this->edges.begin();
-
-    while(end->first != it){
-      end++;
-    }
-
-    for(const auto& y: this->edges){
-      if(y.first == it){
-        for(auto x = this->edges.begin(); x != end; x++){
-          auto got = this->edges.find(swap_pair(y));
-          if(got == end){
-            return false;
-          }
-        }
+  bool validate_to(Tile& t){
+    bool ret = true;
+    map<pair<int,int>, pair<int,int>> g;
+    for(auto& x = this->begin(); x != t; x++){
+      for(auto& y: x->points_to){
+        g[x->pos] = y;
       }
     }
-    return true;
-  }
-private:
-  // checks if the current edge list is a valid solution
-  bool valid(){
-    for(const auto& x: this->edges){
-      set<pair<pair<int,int>,pair<int,int>>>::const_iterator got = this->edges.find(swap_pair(x));
-      if(got == this->edges.end()){
-        return false;
+
+    for(auto& z : g){
+      if(g.find(swap_pair(z)) == g.end()){
+        ret = false;
       }
     }
-    return true;
+    return ret;
   }
 };
+
 
 
 // first solve strategy
 void solve(Grid& grid){
-  list<pair<pair<int,int>,pair<int,int>>> history;
 
-  Edge edges;
-
-  auto f = [&](map<pair<int,int>,Tile>::iterator& it){
-    while(it != grid.grid.end()){
-      auto& tile = it->second;
-      auto pos = it->first;
-
-      // rotate tile until a valid config is found (up to 3 times)
-      while((!tile.valid(pos, grid.width, grid.length)) && tile.rotations < 4){
-        tile.rotate();
-      }
-
-      // fill in edges
-      edges.fill_edges(grid);
-      // if no valid configuration or partial not valid up to this point
-      if(tile.rotations == 4 || (!edges.partial(pos))){
-        // reset tile
-        tile.reset();
-
-        // fill edges
-        edges.fill_edges(grid);
-
-        set<pair<pair<int,int>,pair<int,int>>> tmp;
-        // search edges for all that point to tile
-        for(auto x : edges.edges){
-          if(x.first == pos){
-            tmp.insert(x);
-          }
-        }
-
-        // if something points to it, backtrack to them
-        if(!tmp.empty()){
-          auto y = history.back();
-
-          // find last tile that pointed to this one
-          while(tmp.find(y) == tmp.end() && !history.empty()){
-            // reset it and drop from history
-            grid.grid.find(y.first)->second.reset();
-            history.pop_back();
-
-            // grab next
-            y = history.back();
-          }
-
-          // drop all other entries for y
-          {
-            auto x = history.back();
-            while(x.first == y.first){
-              history.pop_back();
-              x = history.back();
-            }
-          }
-          // if you can't backtrack, that's the end
-          if(history.empty()){
-            end();
-          }
-
-          // get it's position
-          pos = get<0>(y);
-          // set iterator
-          it = grid.grid.find(pos);
-          // rotate once
-          it->second.rotate();
-          // and start again
-          return false;
-        } else {
-          // locked tile, but none point to it == the end
-          end();
-        }
-      }
-      it++;
-    }
-    if(edges.complete(grid)){
-      return true;
-    }else{
-      it = grid.grid.find(make_pair(0,0));
-      it->second.rotate();
-      return false;
-    }
-  };
-  auto it = grid.grid.begin();
-  while(!f(it));
 }
 
 
