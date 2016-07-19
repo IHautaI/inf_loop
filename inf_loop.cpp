@@ -4,6 +4,7 @@
 #include <set>
 #include <map>
 #include <list>
+#include <algorithm>
 using namespace std;
 
 
@@ -35,17 +36,19 @@ class Tile {
   int start;
 
   void update(){
+    this->points_to.clear();
+
     if(UP & this->state && this->pos.first != 0){
-      points_to.push_back(make_pair(this->pos.first - 1, this->pos.second));
+      this->points_to.insert(make_pair(this->pos.first - 1, this->pos.second));
     }
     if(DOWN & this->state && this->pos.first != this->end.first){
-      points_to.push_back(make_pair(this->pos.first + 1, this->pos.second));
+      this->points_to.insert(make_pair(this->pos.first + 1, this->pos.second));
     }
     if(LEFT & this->state && this->pos.second != 0){
-      points_to.push_back(make_pair(this->pos.first, this->pos.second - 1));
+      this->points_to.insert(make_pair(this->pos.first, this->pos.second - 1));
     }
     if(RIGHT & this->state && this->pos.second != this->end.second){
-      points_to.push_back(make_pair(this->pos.first, this->pos.second + 1));
+      this->points_to.insert(make_pair(this->pos.first, this->pos.second + 1));
     }
   }
 
@@ -53,33 +56,43 @@ public:
   int state;
   int rotations;
   pair<int,int> pos;
-  vector<pair<int,in>> points_to;
+  pair<int,int> end;
+  set<pair<int,int>> points_to;
+
+  bool operator==(const Tile other){
+    return this->pos == other.pos;
+  }
 
   // up-right-down-left, clockwise rotation
   // returns true if it can continue rotating
   bool rotate(){
-    bool carry = this->state & 8;
-    this->state = 15 & (this->state << 1);
-    if(carry){
-      this->state = this->state | 1;
+    if(this->rotations < 3){
+      this->state = this->state & 8 ? ((15 & (this->state << 1)) | 1) : (15 & (this->state << 1));
+      this->rotations++;
+      this->update();
     }
-    this->rotations++;
-    this->update();
     return this->rotations < 3;
   }
 
-  void reset(){
-    this->state = this->start;
-    this->rotations = 0;
+  bool reverse(){
+    if(this->rotations > 0){
+      this->state = this->state & 1 ? ((15 & (this->state >> 1)) | 8) : (15 & (this->state >> 1));
+      this->rotations--;
+      this->update();
+    }
+    return this->rotations > 0;
   }
 
-  Tile(int x, pair<int,int> y):start(x),pos(y){state = start; this->update();}
+  Tile(int x, pair<int,int> y):start(x),pos(y){state = start; this->update(); this->rotations=0;}
 
   // copy cstr
   Tile(const Tile& o){
     start = o.start;
     state = o.start;
     rotations = 0;
+    pos = o.pos;
+    this->update();
+    end = o.end;
   }
 
   void reset(){
@@ -89,7 +102,11 @@ public:
   }
 
   bool empty(){
-    return 0 | this->state;
+    return !(0 | this->state);
+  }
+
+  bool done(){
+    return this->rotations == 3;
   }
 
   friend ostream& operator<<(ostream& stream, const Tile& t){
@@ -97,10 +114,16 @@ public:
     return stream;
   }
 
-  bool valid(pair<int,int> pos, int width, int length){
-    int i = get<0>(pos);
-    int j = get<1>(pos);
-    return !((i == 0 && this->state & UP) || (i == width - 1 && this->state & DOWN) || (j == 0 && this->state & LEFT) || (j == length - 1 && this->state & RIGHT));
+  void set_end(pair<int,int> r){
+    this->end = r;
+  }
+
+  bool valid(){
+    int width = this->end.first;
+    int length = this->end.second;
+    int i = get<0>(this->pos);
+    int j = get<1>(this->pos);
+    return !((i == 0 && this->state & UP) || (i == width && this->state & DOWN) || (j == 0 && this->state & LEFT) || (j == length && this->state & RIGHT));
   }
 
 };
@@ -120,11 +143,11 @@ public:
   }
 
   friend ostream& operator<<(ostream& stream, Grid& gr){
-    for(auto x : grid){
+    for(auto& x : gr.grid){
       if(x.pos.second == 0){
         stream << "\n";
       }
-      stream << x << " ";
+      stream << x << " " ;
     }
     stream << "\n";
 
@@ -134,13 +157,14 @@ public:
   Grid(istream& in){
     // create grid from stdin tsv
     vector<Tile> gr;
+    vector<int> check;
 
     stringstream ss;
     string line;
 
     int i = 0;
     // read in lines one-by-one into line
-    while(getline(in, line)){
+    while(getline(in, line) && !line.empty()){
       // setup stream from line
       ss.clear();
       ss.str("");
@@ -149,7 +173,7 @@ public:
       // extract tiles from stringstream, put in map
       int y;
       int j = 0;
-      vector<int> check;
+
       while(ss >> y){
         Tile t(y, make_pair(i,j));
         gr.push_back(t);
@@ -159,38 +183,49 @@ public:
       i++;
     }
 
-    // validate size, should be rectangular
+    auto last = gr.back().pos;
+    for(auto& x : gr){
+      x.set_end(last);
+    }
+    // validate size, should be rectangular, and endpoint to tiles
     for(auto& x: check){
       if(x != check[0]){
         cerr << "Invalid Input, not rectangular.  Exiting" << endl;
         exit(1);
       }
     }
-
-    // set values
     this->grid = gr;
-    this->width = i;
-    this->length = target;
-    cout << "valid shape input\n";
-    cout << "width: " <<this->width << "\n";
-    cout << "length: " << this->length << "\n";
   }
 
   bool validate_to(Tile& t){
-    bool ret = true;
-    map<pair<int,int>, pair<int,int>> g;
-    for(auto& x = this->begin(); x != t; x++){
+    set<pair<int,int>> g;
+    set<pair<int,int>> h;
+
+    // up to t, get all tiles who point to t
+    for(auto x = this->grid.begin(); x->pos != t.pos; x++){
       for(auto& y: x->points_to){
-        g[x->pos] = y;
+        if(y == t.pos){
+          g.insert(x->pos);
+          cout << "g: " << x->pos.first << "," << x->pos.second << "\n";
+        }
+      }
+      // get all tiles t points to that are before it
+      if(find(t.points_to.begin(), t.points_to.end(), x->pos) != t.points_to.end()){
+        h.insert(x->pos);
+        cout <<"h: " << x->pos.first << "," << x->pos.second << "\n";
       }
     }
 
-    for(auto& z : g){
-      if(g.find(swap_pair(z)) == g.end()){
-        ret = false;
+    return g == h;
+  }
+
+  vector<Tile>::iterator find_first_points_to(Tile& x){
+    for(auto y = this->grid.begin(); y != this->grid.end(); y++){
+      if(find(y->points_to.begin(), y->points_to.end(), x.pos) != y->points_to.end()){
+        return y;
       }
     }
-    return ret;
+    return this->grid.end();
   }
 };
 
@@ -198,27 +233,94 @@ public:
 
 // first solve strategy
 void solve(Grid& grid){
+  int m = 0;
 
+  auto f = [&](){
+
+    for(auto x = grid.begin() + m; x != grid.end(); x++){
+      cout << grid << "\n";
+      cout << x->pos.first << "," << x->pos.second << "\n";
+      // no more rotations? done
+      if(x->done()){
+        end();
+      }
+      // empty? move on
+      if(x->empty()){
+        continue;
+      }
+
+      // if everything valid so far, move on
+      if(!grid.validate_to(*x) || !x->valid()){
+        cout << "invalid\n";
+
+        auto n = true;
+        // rotate until valid, or you can't anymore
+        while(n && !(x->valid() && grid.validate_to(*x))){n = x->rotate();}
+
+        // if not valid
+        if(!x->valid()){
+          cout << "backtrack (valid)\n";
+
+          auto n = true;
+          // rotate back until a valid constrained position is found
+          while(n && !x->valid() && !grid.validate_to(*x)){n = x->reverse();}
+          cout << "reversing " << x->state << "\n";
+          cout << x->valid() << " " << grid.validate_to(*x) << "\n";
+          // if not found, done
+          if(!x->valid() || !grid.validate_to(*x)){
+            end();
+          }
+
+          // otherwise backtrack to constraint
+          auto new_it = grid.find_first_points_to(*x);
+          m = new_it - grid.grid.begin();
+          if(m < 0){end();}
+          // reset all after new start point
+          for(auto y = grid.begin() + m + 1; y!= grid.end(); y++){
+            y->reset();
+          }
+          // rotate new start point
+          (grid.begin() + m)->rotate();
+
+          return true;
+        }
+
+        // if valid, but constrained, backtrack to constraining point
+        if(!grid.validate_to(*x)){
+          cout << "backtrack (valid_to)\n";
+          auto new_it = grid.find_first_points_to(*x);
+          m = new_it - grid.grid.begin();
+
+          // reset all after new start point
+          for(auto y = grid.begin() + m + 1; y != grid.end(); y++){
+            y->reset();
+          }
+          // rotate new start point
+          (grid.begin() + m)->rotate();
+
+          return true;
+        }
+      }
+      cout << "validated\n";
+    }
+    return false;
+  };
+
+  while(f());
+
+  cout << "solved\n\n";
+  cout << grid << endl;
+  exit(0);
 }
 
 
 int main(){
   Grid grid = Grid(cin);
-  Edge edge;
 
   cout << "Input:\n";
-  cout << grid;
+  cout << grid << "\n";
 
-  // while not solved, solve it...
-  while(!edge.complete(grid)){
-    solve(grid);
-    cout << "\n";
-    cout << grid;
-  }
-  cout << "\n\n";
-  // print solved grid
-  cout << "solved:\n";
-  cout << grid;
+  solve(grid);
 
   return 0;
 }
