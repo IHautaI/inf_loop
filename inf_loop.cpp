@@ -30,24 +30,25 @@ pair<pair<int,int>,pair<int,int>> swap_pair(const pair<pair<int,int>,pair<int,in
 // via rotate() (clockwise)
 class Tile {
   static const int UP = 1;
+  static const int RIGHT = 2;
   static const int DOWN = 4;
   static const int LEFT = 8;
-  static const int RIGHT = 2;
+
   int start;
 
   void update(){
     this->points_to.clear();
 
-    if(UP & this->state && this->pos.first != 0){
+    if((UP & this->state) == 0 && this->pos.first != 0){
       this->points_to.insert(make_pair(this->pos.first - 1, this->pos.second));
     }
-    if(DOWN & this->state && this->pos.first != this->end.first){
+    if((DOWN & this->state) == 0 && this->pos.first != this->end.first){
       this->points_to.insert(make_pair(this->pos.first + 1, this->pos.second));
     }
-    if(LEFT & this->state && this->pos.second != 0){
+    if((LEFT & this->state) == 0 && this->pos.second != 0){
       this->points_to.insert(make_pair(this->pos.first, this->pos.second - 1));
     }
-    if(RIGHT & this->state && this->pos.second != this->end.second){
+    if((RIGHT & this->state) == 0 && this->pos.second != this->end.second){
       this->points_to.insert(make_pair(this->pos.first, this->pos.second + 1));
     }
   }
@@ -197,20 +198,31 @@ public:
     this->grid = gr;
   }
 
-  bool validate_to(Tile& t){
+  bool validate_to(vector<Tile>::iterator t){
     set<pair<int,int>> g;
     set<pair<int,int>> h;
+    cout << "t state "<< t->state;
+
+    for(auto x = t->points_to.begin(); x != t->points_to.end(); x++){
+      cout << ", points_to " << x->first << "," << x->second;
+    }
+
+    cout << "\n";
 
     // up to t, get all tiles who point to t
-    for(auto x = this->grid.begin(); x->pos != t.pos; x++){
+    for(auto x = this->grid.begin(); x < t; x++){
+      cout << x->pos.first << "," << x->pos.second << " state " << x->state <<", ";
       for(auto& y: x->points_to){
-        if(y == t.pos){
+        cout << "points_to " << y.first << "," << y.second << ", ";
+        if(y == t->pos){
           g.insert(x->pos);
+          cout << "\n";
           cout << "g: " << x->pos.first << "," << x->pos.second << "\n";
         }
+        cout << "\n";
       }
       // get all tiles t points to that are before it
-      if(find(t.points_to.begin(), t.points_to.end(), x->pos) != t.points_to.end()){
+      if(find(t->points_to.begin(), t->points_to.end(), x->pos) != t->points_to.end()){
         h.insert(x->pos);
         cout <<"h: " << x->pos.first << "," << x->pos.second << "\n";
       }
@@ -238,8 +250,11 @@ void solve(Grid& grid){
   auto f = [&](){
 
     for(auto x = grid.begin() + m; x != grid.end(); x++){
+      cout << "---------\n";
       cout << grid << "\n";
-      cout << x->pos.first << "," << x->pos.second << "\n";
+      cout << "checking " << x->pos.first << "," << x->pos.second << "\n";
+      cout << "---------\n";
+
       // no more rotations? done
       if(x->done()){
         end();
@@ -250,12 +265,14 @@ void solve(Grid& grid){
       }
 
       // if everything valid so far, move on
-      if(!grid.validate_to(*x) || !x->valid()){
+      if(!grid.validate_to(x) || !x->valid()){
         cout << "invalid\n";
 
-        auto n = true;
+        auto n = x->rotations < 3;
+        auto k = x->valid();
+        auto r = grid.validate_to(x);
         // rotate until valid, or you can't anymore
-        while(n && !(x->valid() && grid.validate_to(*x))){n = x->rotate();}
+        while(n && !(k && r)){n = x->rotate(); cout << "rotating to state " << x->state << "\n\n"; k = x->valid(); r = grid.validate_to(x);}
 
         // if not valid
         if(!x->valid()){
@@ -263,11 +280,11 @@ void solve(Grid& grid){
 
           auto n = true;
           // rotate back until a valid constrained position is found
-          while(n && !x->valid() && !grid.validate_to(*x)){n = x->reverse();}
-          cout << "reversing " << x->state << "\n";
-          cout << x->valid() << " " << grid.validate_to(*x) << "\n";
+          while(n && !x->valid() && !grid.validate_to(x)){n = x->reverse();cout << "reversing to state " << x->state << "\n";}
+
+          cout << x->valid() << " " << grid.validate_to(x) << "\n";
           // if not found, done
-          if(!x->valid() || !grid.validate_to(*x)){
+          if(!x->valid() || !grid.validate_to(x)){
             end();
           }
 
@@ -286,7 +303,7 @@ void solve(Grid& grid){
         }
 
         // if valid, but constrained, backtrack to constraining point
-        if(!grid.validate_to(*x)){
+        if(!grid.validate_to(x)){
           cout << "backtrack (valid_to)\n";
           auto new_it = grid.find_first_points_to(*x);
           m = new_it - grid.grid.begin();
