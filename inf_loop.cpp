@@ -33,6 +33,7 @@ class Tile {
   static const int RIGHT = 2;
   static const int DOWN = 4;
   static const int LEFT = 8;
+  static const map<int,string> uc;
 
   int start;
 
@@ -116,7 +117,7 @@ public:
   }
 
   friend ostream& operator<<(ostream& stream, const Tile& t){
-    stream << t.state;
+    stream << uc.at(t.state);
     return stream;
   }
 
@@ -134,6 +135,10 @@ public:
 
 };
 
+const map<int,string> Tile::uc = {{0,"o"}, {1,"\u2575"}, {2,"\u2576"},{3,"\u2514"}, {4,"\u2577"},
+            {5,"\u2502"}, {6,"\u250C"}, {7,"\u251C"}, {8,"\u2574"},
+            {9,"\u2518"}, {10,"\u2500"}, {11,"\u2534"}, {12, "\u2510"},
+            {13, "\u2524"}, {14,"\u252C"},{15,"\u253C"}};
 
 // Representation of the puzzle - rectangular set of tiles w/ states
 class Grid {
