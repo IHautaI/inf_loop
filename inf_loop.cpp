@@ -163,44 +163,42 @@ public:
 
   void peel_tr(vector<Tile>& vec, vector<Tile>& x, int hstart, int hend, int vstart, int vend, int rowsize){
     int i = 0, j = 0;
-    cout << "tr " << hstart << " " << hend << " " << vstart << " " << vend << "\n";
-
-    if(hend - hstart > 0){
-    // go across row
+    if(hend - hstart > 1){
+      // go across row
       for(j = hstart; j < hend; j++){
         x.push_back(vec[i*rowsize + j]);
       }
     }
-    if(vend - vstart > 0){
+    if(vend - vstart > 1){
       // go down column
       for(i = vstart; i < vend; i++){
         x.push_back(vec[i*rowsize + j]);
       }
     }
 
-    if(hend - hstart > 0 || vend - vstart > 0){
+    if(hend - hstart > 1 || vend - vstart > 1){
       peel_bl(vec, x, hstart, hend - 1, vstart + 1, vend, rowsize);
     }
   }
 
   void peel_bl(vector<Tile>& vec, vector<Tile>& x, int hstart, int hend, int vstart, int vend, int rowsize){
     int i = 0, j = 0;
-    cout << "bl " << hstart << " " << hend << " " << vstart << " " << vend << "\n";
-    // go across row backwards
-    if(hend - hstart > 0){
-      for(j = hend - 1; j >= hstart; j--){
+
+    if(hend - hstart > 1){
+      // go across row backwards
+      for(j = hend - 1; j > hstart; j--){
         x.push_back(vec[i*rowsize + j]);
       }
     }
 
-    if(vend - vstart > 0){
+    if(vend - vstart > 1){
     // go up side
-      for(i = vend - 1; i <= vstart; i--){
+      for(i = vend - 1; i < vstart; i--){
         x.push_back(vec[i*rowsize + j]);
       }
     }
 
-    if(hend - hstart > 0 || vend - vstart > 0){
+    if(hend - hstart > 1 || vend - vstart > 1){
       peel_tr(vec, x, hstart + 1, hend, vstart, vend - 1, rowsize);
     }
 
