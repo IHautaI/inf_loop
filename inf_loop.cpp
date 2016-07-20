@@ -216,15 +216,15 @@ public:
         cout << "points_to " << y.first << "," << y.second << ", ";
         if(y == t->pos){
           g.insert(x->pos);
-          cout << "\n";
-          cout << "g: " << x->pos.first << "," << x->pos.second << "\n";
+          // cout << "\n";
+          // cout << "g: " << x->pos.first << "," << x->pos.second << "\n";
         }
         cout << "\n";
       }
       // get all tiles t points to that are before it
       if(find(t->points_to.begin(), t->points_to.end(), x->pos) != t->points_to.end()){
         h.insert(x->pos);
-        cout <<"h: " << x->pos.first << "," << x->pos.second << "\n";
+        // cout <<"h: " << x->pos.first << "," << x->pos.second << "\n";
       }
     }
 
