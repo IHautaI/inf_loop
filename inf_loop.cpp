@@ -155,12 +155,72 @@ public:
     return grid.end();
   }
 
+  vector<Tile> spiral_sort(int rowsize, vector<Tile>& vec){
+    vector<Tile> x;
+    peel_tr(vec, x, 0, rowsize, 0, vec.size() / rowsize, rowsize);
+    return x;
+  }
+
+  void peel_tr(vector<Tile>& vec, vector<Tile>& x, int hstart, int hend, int vstart, int vend, int rowsize){
+    int i = 0, j = 0;
+    cout << "tr " << hstart << " " << hend << " " << vstart << " " << vend << "\n";
+
+    if(hend - hstart > 0){
+    // go across row
+      for(j = hstart; j < hend; j++){
+        x.push_back(vec[i*rowsize + j]);
+      }
+    }
+    if(vend - vstart > 0){
+      // go down column
+      for(i = vstart; i < vend; i++){
+        x.push_back(vec[i*rowsize + j]);
+      }
+    }
+
+    if(hend - hstart > 0 || vend - vstart > 0){
+      peel_bl(vec, x, hstart, hend - 1, vstart + 1, vend, rowsize);
+    }
+  }
+
+  void peel_bl(vector<Tile>& vec, vector<Tile>& x, int hstart, int hend, int vstart, int vend, int rowsize){
+    int i = 0, j = 0;
+    cout << "bl " << hstart << " " << hend << " " << vstart << " " << vend << "\n";
+    // go across row backwards
+    if(hend - hstart > 0){
+      for(j = hend - 1; j >= hstart; j--){
+        x.push_back(vec[i*rowsize + j]);
+      }
+    }
+
+    if(vend - vstart > 0){
+    // go up side
+      for(i = vend - 1; i <= vstart; i--){
+        x.push_back(vec[i*rowsize + j]);
+      }
+    }
+
+    if(hend - hstart > 0 || vend - vstart > 0){
+      peel_tr(vec, x, hstart + 1, hend, vstart, vend - 1, rowsize);
+    }
+
+  }
+
   friend ostream& operator<<(ostream& stream, Grid& gr){
-    for(auto& x : gr.grid){
+    vector<int> printer(gr.grid.size());
+
+    for(int i = 0; i < printer.size(); i++){
+      printer[i] = i;
+    }
+
+    sort(printer.begin(), printer.end(), [&](int x, int y){return gr.grid[x].pos.first < gr.grid[y].pos.first || (gr.grid[x].pos.first == gr.grid[y].pos.first && gr.grid[x].pos.second < gr.grid[y].pos.second);});
+
+    for(auto i : printer){
+      auto x = gr.grid[i];
       if(x.pos.second == 0){
         stream << "\n";
       }
-      stream << x;
+      stream << x.pos.first << "," << x.pos.second << " ";
     }
     stream << "\n";
 
@@ -170,6 +230,7 @@ public:
   Grid(istream& in){
     // create grid from stdin tsv
     vector<Tile> gr;
+
     vector<int> check;
 
     stringstream ss;
@@ -207,7 +268,7 @@ public:
         exit(1);
       }
     }
-    this->grid = gr;
+    this->grid = spiral_sort(gr.back().pos.second + 1, gr);
   }
 
   bool validate_to(vector<Tile>::iterator t){
@@ -256,11 +317,11 @@ public:
 
 // first solve strategy
 void solve(Grid& grid){
-  int m = 0;
+  auto m = grid.begin();
   cout << "Solving...\n--------\n";
   auto f = [&](){
-    for(auto x = grid.begin() + m; x != grid.end(); x++){
-      // cout << grid;
+    for(auto x = m; x != grid.end(); x++){
+      cout << grid;
 
       bool valid = x->valid();
       bool constrained = grid.validate_to(x);
@@ -273,7 +334,7 @@ void solve(Grid& grid){
           end();
         }
         // cout << "backtrack 1\n";
-        m = x - grid.begin() - 1;
+        m = x - 1;
         x->reset();
         (x-1)->rotate();
         return true;
@@ -306,14 +367,14 @@ void solve(Grid& grid){
 
           if(new_it - grid.begin() == 0){
             // cout << "backtracking 1\n";
-            m = x - grid.begin() - 1;
+            m = x - 1;
             x->reset();
             (x-1)->rotate();
             return true;
           }
 
           // set move to tile before constraint
-          m = new_it - grid.begin() - 1;
+          m = new_it - 1;
 
           // reset tiles after constraint
           for(auto y = new_it + 1; y == x; y++){
