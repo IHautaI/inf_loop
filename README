@@ -3,3 +3,5 @@ https://www.reddit.com/r/dailyprogrammer/comments/4rug59/20160708_challenge_274_
 
 It has been tested compiling with clang++ --std=c++11
 
+you can test with `./inf_loop < test`
+after compiling.
