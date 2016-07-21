@@ -92,11 +92,11 @@ public:
 
   // copy cstr
   Tile(const Tile& o){
-    start = o.start;
-    state = o.start;
-    rotations = 0;
-    pos = o.pos;
-    end = o.end;
+    this->start = o.start;
+    this->state = o.state;
+    this->rotations = o.rotations;
+    this->pos = o.pos;
+    this->end = o.end;
     this->update();
   }
 
@@ -118,7 +118,7 @@ public:
     return this->rotations == 0;
   }
 
-  friend ostream& operator<<(ostream& stream, const Tile& t){
+  friend ostream& operator<<(ostream& stream, Tile& t){
     stream << uc.at(t.state);
     return stream;
   }
@@ -157,51 +157,44 @@ public:
 
   vector<Tile> spiral_sort(int rowsize, vector<Tile>& vec){
     vector<Tile> x;
-    peel_tr(vec, x, 0, rowsize, 0, vec.size() / rowsize, rowsize);
+    peel_tr(vec, x, 0, rowsize, 0, vec.size() / rowsize, rowsize, 0);
     return x;
   }
 
-  void peel_tr(vector<Tile>& vec, vector<Tile>& x, int hstart, int hend, int vstart, int vend, int rowsize){
-    int i = 0, j = 0;
-    if(hend - hstart > 1){
-      // go across row
-      for(j = hstart; j < hend; j++){
-        x.push_back(vec[i*rowsize + j]);
-      }
-    }
-    if(vend - vstart > 1){
-      // go down column
-      for(i = vstart; i < vend; i++){
-        x.push_back(vec[i*rowsize + j]);
-      }
+  void peel_tr(vector<Tile>& vec, vector<Tile>& x, int hstart, int hend, int vstart, int vend, int rowsize, int total){
+    // go across row
+    for(auto j = hstart; j < hend && total < vec.size(); j++){
+      total += 1;
+      x.push_back(vec[vstart*rowsize + j]);
     }
 
-    if(hend - hstart > 1 || vend - vstart > 1){
-      peel_bl(vec, x, hstart, hend - 1, vstart + 1, vend, rowsize);
+    // go down column
+    for(auto i = vstart + 1; i < vend && total < vec.size(); i++){
+      total += 1;
+      x.push_back(vec[i*rowsize + hend - 1]);
+    }
+
+    if(total < vec.size()){
+      peel_bl(vec, x, hstart, hend - 1, vstart, vend - 1, rowsize, total);
     }
   }
 
-  void peel_bl(vector<Tile>& vec, vector<Tile>& x, int hstart, int hend, int vstart, int vend, int rowsize){
-    int i = 0, j = 0;
-
-    if(hend - hstart > 1){
-      // go across row backwards
-      for(j = hend - 1; j > hstart; j--){
-        x.push_back(vec[i*rowsize + j]);
-      }
+  void peel_bl(vector<Tile>& vec, vector<Tile>& x, int hstart, int hend, int vstart, int vend, int rowsize, int total){
+    // go across row backwards
+    for(auto j = hend - 1; j >= hstart && total < vec.size(); j--){
+      total += 1;
+      x.push_back(vec[vend*rowsize + j]);
     }
 
-    if(vend - vstart > 1){
-    // go up side
-      for(i = vend - 1; i < vstart; i--){
-        x.push_back(vec[i*rowsize + j]);
-      }
+  // go up side
+    for(auto i = vend - 1; i >= vstart + 1 && total < vec.size(); i--){
+      total += 1;
+      x.push_back(vec[i*rowsize + hstart]);
     }
 
-    if(hend - hstart > 1 || vend - vstart > 1){
-      peel_tr(vec, x, hstart + 1, hend, vstart, vend - 1, rowsize);
+    if(total < vec.size()){
+      peel_tr(vec, x, hstart + 1, hend, vstart + 1, vend, rowsize, total);
     }
-
   }
 
   friend ostream& operator<<(ostream& stream, Grid& gr){
@@ -218,9 +211,9 @@ public:
       if(x.pos.second == 0){
         stream << "\n";
       }
-      stream << x.pos.first << "," << x.pos.second << " ";
+      stream << x << " ";
     }
-    stream << "\n";
+    stream << "\n\n";
 
     return stream;
   }
@@ -324,14 +317,14 @@ void solve(Grid& grid){
       bool valid = x->valid();
       bool constrained = grid.validate_to(x);
 
-      // cout << x->pos.first << "," << x->pos.second << "\n";
-      // cout << valid << " " << constrained << "\n";
+      cout << x->pos.first << "," << x->pos.second << "\n";
+      cout << valid << " " << constrained << "\n";
 
       if(x->exhausted()){
         if(x == grid.begin()){
           end();
         }
-        // cout << "backtrack 1\n";
+        cout << "backtrack 1\n";
         m = x - 1;
         x->reset();
         (x-1)->rotate();
@@ -344,9 +337,9 @@ void solve(Grid& grid){
 
       // if not valid or constraints not met, rotate
       if(!valid || !constrained){
-        // cout << "not constrained\n";
+        cout << "not constrained\n";
         int rot = -1;
-        while(!(valid && constrained) && !x->exhausted()){x->rotate(); valid = x->valid(); constrained = grid.validate_to(x); rot+=1;}
+        while(!(valid && constrained) && !x->exhausted()){x->rotate(); valid = x->valid(); constrained = grid.validate_to(x); rot+=1; cout << "rotating\n";}
 
         // no usable position found, so backtrack
         if(!valid || !constrained){
@@ -356,12 +349,12 @@ void solve(Grid& grid){
             rot--;
           }
 
-          // cout << "backtracking\n";
+          cout << "backtracking\n";
 
           // nearest constraining tile
           auto new_it = grid.find_last_points_to(x);
-          // cout << "new_it = " << new_it->pos.first << "," << new_it->pos.second << "\n";
-          // cout << "diff " << new_it - grid.begin() << "\n";
+          cout << "new_it = " << new_it->pos.first << "," << new_it->pos.second << "\n";
+          cout << "diff " << new_it - grid.begin() << "\n";
 
           if(new_it - grid.begin() == 0){
             // cout << "backtracking 1\n";
