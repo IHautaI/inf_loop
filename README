@@ -1,7 +1,14 @@
 This is a solution to the reddit/r/dailyprogrammer problem featured here: 
 https://www.reddit.com/r/dailyprogrammer/comments/4rug59/20160708_challenge_274_hard_loop_solver/
 
-It has been tested compiling with clang++ --std=c++11
+It has been tested compiling with clang++ --std=c++11 -lpthread
 
-you can test with `./inf_loop < test`
-after compiling.
+It produces text output showing each solution found, 
+and each step of that soluction in order. 
+
+This may be a lot of text.
+
+after compiling,
+you can test with `./inf_loop < *test`
+where * is '', 'big_', or 'huge_'.
+big and huge might take a long while.

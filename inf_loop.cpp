@@ -5,6 +5,7 @@
 #include <map>
 #include <list>
 #include <algorithm>
+#include <future>
 using namespace std;
 
 
@@ -77,6 +78,12 @@ public:
       this->state = this->state & 8 ? ((15 & (this->state << 1)) | 1) : (15 & (this->state << 1));
       this->rotations++;
       this->update();
+    }
+  }
+
+  void rotate(int i){
+    for(int j = 0; j < i; j++){
+      this->rotate();
     }
   }
 
@@ -211,7 +218,7 @@ public:
       if(x.pos.second == 0){
         stream << "\n";
       }
-      stream << x << " ";
+      stream << x;
     }
     stream << "\n\n";
 
@@ -265,19 +272,10 @@ public:
   bool validate_to(vector<Tile>::iterator t){
     set<pair<int,int>> g;
     set<pair<int,int>> h;
-    // cout << "t state "<< t->state;
-
-    // not needed, just for logging process
-    // for(auto x = t->points_to.begin(); x != t->points_to.end(); x++){
-    //   cout << ", points_to " << x->first << "," << x->second;
-    // }
 
     // up to t, get all tiles who point to t
     for(auto x = this->grid.begin(); x < t; x++){
-      // cout << "\n";
-      // cout << x->pos.first << "," << x->pos.second << " state " << x->state <<", points_to ";
       for(auto& y: x->points_to){
-        // cout << y.first << "," << y.second << " ";
         if(y == t->pos){
           g.insert(x->pos);
         }
@@ -288,19 +286,8 @@ public:
         h.insert(x->pos);
       }
     }
-    // cout << "\n";
 
     return g == h;
-  }
-
-  vector<Tile>::iterator find_last_points_to(vector<Tile>::iterator x){
-    for(auto y = x - 1; y > this->grid.begin(); y--){
-      // if it points to x and x points to it, return it
-      if(find(y->points_to.begin(), y->points_to.end(), x->pos) != y->points_to.end() && find(x->points_to.begin(), x->points_to.end(), y->pos) != x->points_to.end()){
-        return y;
-      }
-    }
-    return this->grid.begin();
   }
 };
 
@@ -308,84 +295,73 @@ public:
 
 // first solve strategy
 void solve(Grid& grid){
-  auto m = grid.begin();
-  cout << "Solving...\n--------\n";
-  auto f = [&](){
-    for(auto x = m; x != grid.end(); x++){
-      cout << grid;
+  // for each idx, move set (just rotation counts < 4)
+  // find valid configs for Tile at idx with that move set
+  // make futures with (m+1, g) and wait for them
+  std::function<vector<pair<bool, vector<int>>>(int, Grid, vector<int>)> f = [&](int idx, Grid g, vector<int> moves){
+    vector<pair<bool, vector<int>>> ret;
+    auto launch = (idx < 14)? std::launch::async : std::launch::deferred;
+    auto it = g.begin() + idx;
+    if(it < g.end() - 1){
+      vector<future<vector<pair<bool,vector<int>>>>> futures; // result + moves
 
-      bool valid = x->valid();
-      bool constrained = grid.validate_to(x);
+      moves.push_back(0);
+      for(auto m = 0; m < 4; m++){
+        moves[idx] = m;
 
-      cout << x->pos.first << "," << x->pos.second << "\n";
-      cout << valid << " " << constrained << "\n";
-
-      if(x->exhausted()){
-        if(x == grid.begin()){
-          end();
+        if(it->valid() && g.validate_to(it)){
+          futures.push_back(std::async(launch, f, idx + 1, g, moves));
+        } else {
+          ret.push_back(make_pair(false, moves));
         }
-        cout << "backtrack 1\n";
-        m = x - 1;
-        x->reset();
-        (x-1)->rotate();
-        return true;
+        it->rotate();
       }
 
-      if(x->empty()){
-        continue;
-      }
-
-      // if not valid or constraints not met, rotate
-      if(!valid || !constrained){
-        cout << "not constrained\n";
-        int rot = -1;
-        while(!(valid && constrained) && !x->exhausted()){x->rotate(); valid = x->valid(); constrained = grid.validate_to(x); rot+=1; cout << "rotating\n";}
-
-        // no usable position found, so backtrack
-        if(!valid || !constrained){
-          // backup
-          while(rot){
-            x->reverse();
-            rot--;
+      for(auto& x : futures){
+        auto y = x.get();
+        for(auto& z : y){
+          if(z.first){
+            ret.push_back(z);
           }
-
-          cout << "backtracking\n";
-
-          // nearest constraining tile
-          auto new_it = grid.find_last_points_to(x);
-          cout << "new_it = " << new_it->pos.first << "," << new_it->pos.second << "\n";
-          cout << "diff " << new_it - grid.begin() << "\n";
-
-          if(new_it - grid.begin() == 0){
-            // cout << "backtracking 1\n";
-            m = x - 1;
-            x->reset();
-            (x-1)->rotate();
-            return true;
-          }
-
-          // set move to tile before constraint
-          m = new_it - 1;
-
-          // reset tiles after constraint
-          for(auto y = new_it + 1; y == x; y++){
-            y->reset();
-          }
-
-          // rotate constraint
-          new_it->rotate();
-
-          return true;
         }
+      }
+    } else {
+      for(auto m = 0; m < 4; m++){
+        moves[idx] = m;
+        if(it->valid() && g.validate_to(it)){
+          ret.push_back(make_pair(true, moves));
+        }
+        it->rotate();
       }
     }
-    return false;
+    return ret;
   };
 
-  while(f());
+  auto solutions = f(0, grid, vector<int>());
 
-  cout << "solved\n\n";
-  cout << grid << endl;
+  // iterate over solutions
+  int i = 0;
+  for(auto x : solutions){
+    // if a true solution
+    if(x.first){
+      // reset grid
+      for(auto y = grid.grid.begin(); y < grid.grid.end(); y++){
+        y->reset();
+      }
+      // iterate through moves, applying to grid and printing steps
+      cout << "\nSolution " << i << "\n-----------------\n\n";
+      for(auto i = 0; i < x.second.size(); i++){
+        grid.grid[i].rotate(x.second[i]);
+        cout << grid << "\n\n";
+      }
+      i++;
+
+      cout << "solved\n\n";
+      cout << grid << "\n\n";
+      cout << "--------------------\n\n";
+    }
+  }
+
   exit(0);
 }
 
