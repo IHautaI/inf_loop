@@ -16,23 +16,25 @@ void end(){
 // make futures with (m+1, g) and wait for them
 // toggling between async launch and deferred launch at specified # async calls
 void solve(Grid& grid, int threads){
+  cout << "solving...\n" << endl;
   int current_threads = 0;
 
   std::function<vector<pair<std::launch, vector<int>>>(std::launch, int, Grid, vector<int>)> f = [&](std::launch policy, int idx, Grid g, vector<int> moves){
     vector<pair<std::launch, vector<int>>> ret;
     auto it = g.begin() + idx;
+    cout << "call# " << it - g.begin() << "\n";
+    moves.push_back(0); // resize
 
     if(it < g.end() - 1){
       vector<future<vector<pair<std::launch,vector<int>>>>> futures; // result + moves
 
-      // next move
-      moves.push_back(0);
       // iterate over possibilities
       for(auto m = it->moves.begin(); m < it->moves.end(); m++){
         moves[idx] = m - it->moves.begin();
 
         // if the move is valid
         if(it->valid() && g.validate_to(it)){
+          // set launch type
           auto launch = (current_threads < threads)? std::launch::async : std::launch::deferred;
           if(launch == std::launch::async){
             current_threads++;
@@ -43,7 +45,7 @@ void solve(Grid& grid, int threads){
         it->rotate();
       }
 
-      // now check futures
+      // now collect futures
       for(auto& x : futures){
         auto y = x.get();
         for(auto& z : y){
@@ -66,11 +68,19 @@ void solve(Grid& grid, int threads){
         it->rotate();
       }
     }
+    for(auto& x: moves){
+      cout << "moves\n";
+      cout << x << " ";
+      cout << "\n";
+    }
     return ret;
   };
 
   auto solutions = f(std::launch::deferred, 0, grid, vector<int>());
 
+  if(solutions.size() == 0){
+    end();
+  }
   // iterate over solutions
   int i = 0;
   for(auto x : solutions){

@@ -27,10 +27,9 @@ void Tile::make_moves(){
   do {
     this->moves.push_back(st);
     // rotate
-    st = (8 & st) ? ((15 & (this->start << 1)) | 1) : (15 & (this->start << 1));
+    st = (8 & st) ? ((15 & (st << 1)) | 1) : (15 & (st << 1));
   } while(st != this->start);
   this->state = this->moves.begin();
-  cout << this->moves[0] << "\n";
 }
 
 bool Tile::operator==(const Tile other){
@@ -57,6 +56,7 @@ Tile::Tile(const Tile& o){
   this->pos = o.pos;
   this->end = o.end;
   this->make_moves();
+  this->state = this->moves.begin() + (o.state - o.moves.begin());
   this->update();
 }
 
