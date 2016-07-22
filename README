@@ -1,10 +1,11 @@
 This is a solution to the reddit/r/dailyprogrammer problem featured here: 
 https://www.reddit.com/r/dailyprogrammer/comments/4rug59/20160708_challenge_274_hard_loop_solver/
 
-It has been tested compiling with clang++ --std=c++11 -lpthread
+It has been tested compiling with clang++ on Debian Linux.
+A Makefile is included, if you have clang you can compile by cd'ing in and entering `make`.
 
 It produces text output showing each solution found, 
-and each step of that soluction in order. 
+and each step of that soluction in order.
 
 This may be a lot of text.
 
